@@ -21,33 +21,23 @@ Github Repository:
 # ordered by date (from May 2008 to November 2010), very close to the data analyzed in [Moro et al., 2014]
 # 2) bank-additional.csv with 10% of the examples (4119), randomly selected from 1), and 20 inputs.
 
-import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
-from sklearn.metrics import roc_auc_score
-import seaborn as sns
-from sklearn.ensemble import StackingClassifier
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import StackingClassifier
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler
-from sklearn.model_selection import train_test_split
-from lightgbm import LGBMClassifier
-from sklearn.linear_model import LogisticRegression
+import pandas as pd
 from catboost import CatBoostClassifier
-from sklearn.metrics import roc_auc_score, accuracy_score
-import optuna
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 from lightgbm import LGBMClassifier
-from catboost import CatBoostClassifier
 from sklearn.ensemble import StackingClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OrdinalEncoder
+from sklearn.preprocessing import StandardScaler
 
-
-df_test = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject\\DataGlacierWeek9\\bank-additional.csv", sep=';')  # testdata
-df = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject\\DataGlacierWeek9\\bank-additional-full.csv", sep=';')  # traindata
+df_test = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject\\DataGlacierWeek9\\bank-additional.csv",
+                      sep=';')  # testdata
+df = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject\\DataGlacierWeek9\\bank-additional-full.csv",
+                 sep=';')  # traindata
 
 df_test = df_test.sort_index(axis=1).sort_index(axis=0)
 df = df.sort_index(axis=1).sort_index(axis=0)
@@ -80,6 +70,8 @@ def quick_look(dataframe, head=5):
 
 quick_look(df)
 """
+
+
 # Categorical Variable Analysis
 # The distribution of categorical variables isn't balanced across classes.
 # The target variable 'y' exhibits an imbalance.
@@ -371,9 +363,9 @@ weight_conf = 0.29
 
 # Calculate the index
 df['economic_index'] = (weight_euribor * df['euribor3m']) + (weight_price * df['cons.price.idx']) + (
-            weight_conf * df['cons.conf.idx'])
+        weight_conf * df['cons.conf.idx'])
 df_test['economic_index'] = (weight_euribor * df_test['euribor3m']) + (weight_price * df_test['cons.price.idx']) + (
-            weight_conf * df_test['cons.conf.idx'])
+        weight_conf * df_test['cons.conf.idx'])
 
 df['emp_var_euribor3m_sum'] = df['emp.var.rate'] + df['euribor3m']
 df_test['emp_var_euribor3m_sum'] = df_test['emp.var.rate'] + df_test['euribor3m']
@@ -490,7 +482,6 @@ y = df['y']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=50, shuffle=True, stratify=y)
 
-
 scaler = StandardScaler()
 log_reg = LogisticRegression()
 lgbm = LGBMClassifier()
@@ -502,7 +493,7 @@ estimators = [
     ('lgbm', lgbm),
     ('catboost', catboost)
 ]
-#Machine learning alg. stacking.
+# Machine learning alg. stacking.
 stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
 
 # Construct the pipeline
@@ -591,7 +582,6 @@ from sklearn.ensemble import VotingClassifier
 
 X_train = df_test.drop("y", axis=1)
 y_train = df_test["y"]
-
 
 # Define classifiers with the best hyperparameters obtained
 lgbm_best = LGBMClassifier(n_estimators=450, learning_rate=0.05325980760529078, max_depth=6, num_leaves=33)

@@ -186,4 +186,4 @@ print(f"Test AUC Score: {auc}")
 df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
 target_customer_list = df_test.loc[df_test["y"] == "Yes", ["age", "campaign"]]
 
-target_customer_list.to_csv("Target_Customers_In_Campain.csv")
+target_customer_list.to_csv("Target_Customers_in_Campain.csv")

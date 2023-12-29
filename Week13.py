@@ -22,20 +22,16 @@ Github Repository:
 # 2) bank-additional.csv with 10% of the examples (4119), randomly selected from 1), and 20 inputs.
 
 import numpy as np
-import optuna
 import pandas as pd
 from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
-from matplotlib import pyplot as plt
-from sklearn.ensemble import StackingClassifier
+from sklearn.ensemble import StackingClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
+from sklearn.model_selection import train_test_split,  StratifiedKFold
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.pipeline import Pipeline
-from sklearn.ensemble import VotingClassifier
-from sklearn.preprocessing import OrdinalEncoder
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 400)
@@ -180,9 +176,14 @@ y_pred_proba = voting_classifier.predict_proba(X_test)[:, 1]
 
 # Calculate accuracy
 accuracy = accuracy_score(y_test, y_pred)
-print(f"Test Accuracy: {accuracy}")
-
-# Calculate AUC score
+f1_score_value = f1_score(y_test, y_pred)
 auc = roc_auc_score(y_test, y_pred_proba)
+
+print(f"Test Accuracy: {accuracy}")
+print(f"F1 Score: {f1_score_value}")
 print(f"Test AUC Score: {auc}")
 
+df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
+target_customer_list = df_test.loc[df_test["y"] == "Yes", ["age", "campaign"]]
+
+target_customer_list.to_csv("Target_Customers_In_Campain.csv")

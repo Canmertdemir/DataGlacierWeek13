@@ -31,6 +31,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+from sklearn.ensemble import VotingClassifier
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.preprocessing import StandardScaler
 
@@ -82,7 +83,7 @@ quick_look(df)
 # 'Marital' features three classes, with the majority being married or single. 'Married' stands as the dominant class.
 # 'Month' encompasses 10 classes. May, June, July, August, and November hold significant importance.
 # 'Poutcome' showcases three classes, with the 'nonexistent' class being the dominant one. This suggests that the majority of people have not attended a campaign before.
-
+"""
 def grab_col_names(dataframe):
     cat_cols = [col for col in dataframe.columns if str(dataframe[col].dtypes) in ["category", "object", "bool"]]
     print("Categorical Variables", cat_cols)
@@ -124,7 +125,7 @@ def grab_col_names(dataframe):
 
 
 cat_cols, num_cols, categorical_but_cardianal_variable = grab_col_names(df)
-
+"""
 """
 def outlier_thresholds(dataframe, col_name, q1=0.01, q3=0.99):
     quartile1 = dataframe[col_name].quantile(q1)
@@ -476,10 +477,10 @@ df.drop(columns=['contact', 'day_of_week', 'default', 'education', 'housing', 'j
 df_test.drop(columns=['contact', 'day_of_week', 'default', 'education', 'housing', 'job', 'loan', 'marital', 'month',
                       'poutcome'], inplace=True)
 
+#Seperation target variable and other variables.
 X = df.drop('y', axis=1)
-
 y = df['y']
-
+# Splitting data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=50, shuffle=True, stratify=y)
 
 scaler = StandardScaler()
@@ -510,7 +511,6 @@ y_pred = pipeline.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Test Accuracy: {accuracy}")
 
-# Assuming X_train, X_test, y_train, y_test are defined
 """
 # Objective function for hyperparameter optimization
 def objective(trial):
@@ -577,8 +577,6 @@ print(f"Best Parameters: {best_params}")
 # Best Parameters: {'n_estimators_lgbm': 450, 'learning_rate_lgbm': 0.05325980760529078, 'max_depth_lgbm': 6,
 # 'num_leaves_lgbm': 33, 'iterations_catboost': 387, 'learning_rate_catboost': 0.030007096670119283, 'depth_catboost': 9,
 # 'C_logistic': 5.093614309443904, 'solver_logistic': 'lbfgs'}
-
-from sklearn.ensemble import VotingClassifier
 
 X_train = df_test.drop("y", axis=1)
 y_train = df_test["y"]

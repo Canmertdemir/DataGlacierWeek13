@@ -197,20 +197,18 @@ study.optimize(objective, n_trials=100)  # You can increase the number of trials
 best_params = study.best_params
 print(f"Best Parameters: {best_params}")
 
-
 # Use the best parameters to train the final model
-# ... (same code as before using the best_params to instantiate models and pipeline)
-# Best Parameters: {'n_estimators_lgbm': 450, 'learning_rate_lgbm': 0.05325980760529078, 'max_depth_lgbm': 6,
-# 'num_leaves_lgbm': 33, 'iterations_catboost': 387, 'learning_rate_catboost': 0.030007096670119283, 'depth_catboost': 9,
-# 'C_logistic': 5.093614309443904, 'solver_logistic': 'lbfgs'}
+#Best Parameters: {'n_estimators_lgbm': 444, 'learning_rate_lgbm': 0.09206587020378347,
+# 'max_depth_lgbm': 7, 'num_leaves_lgbm': 22, 'iterations_catboost': 482,
+# 'learning_rate_catboost': 0.011108413559931083, 'depth_catboost': 8, 'C_logistic': 0.4457968436493604, 'solver_logistic': 'liblinear'}
 
 X_train = df_test.drop("y", axis=1)
 y_train = df_test["y"]
 
 # Define classifiers with the best hyperparameters obtained
-lgbm_best = LGBMClassifier(n_estimators=450, learning_rate=0.05325980760529078, max_depth=6, num_leaves=33)
-catboost_best = CatBoostClassifier(iterations=387, learning_rate=0.030007096670119283, depth=9)
-log_reg_best = LogisticRegression(C=5.093614309443904, solver='lbfgs', max_iter=1500)
+lgbm_best = LGBMClassifier(n_estimators=444, learning_rate=0.09206587020378347, max_depth=7, num_leaves=22)
+catboost_best = CatBoostClassifier(iterations=482, learning_rate=0.011108413559931083, depth=8)
+log_reg_best = LogisticRegression(C=0.4457968436493604, solver='liblinear', max_iter=1500)
 
 # Create a VotingClassifier
 voting_classifier = VotingClassifier(

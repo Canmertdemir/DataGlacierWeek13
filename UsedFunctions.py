@@ -1,7 +1,15 @@
 import numpy as np
+import optuna
 import sns
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
 from matplotlib import pyplot as plt
 from scipy.stats import skewtest
+from sklearn.ensemble import StackingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 
 def quick_look(dataframe, head=5):
@@ -437,3 +445,56 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 """
+
+
+def objective(trial):
+    lgbm_params = {
+        'n_estimators': trial.suggest_int('n_estimators_lgbm', 50, 500),
+        'learning_rate': trial.suggest_loguniform('learning_rate_lgbm', 0.01, 0.1),
+        'max_depth': trial.suggest_int('max_depth_lgbm', 3, 10),
+        'num_leaves': trial.suggest_int('num_leaves_lgbm', 3, 40),
+    }
+
+    catboost_params = {
+        'iterations': trial.suggest_int('iterations_catboost', 50, 500),
+        'learning_rate': trial.suggest_loguniform('learning_rate_catboost', 0.01, 0.1),
+        'depth': trial.suggest_int('depth_catboost', 3, 10),
+    }
+
+    log_reg_params = {
+        'C': trial.suggest_loguniform('C_logistic', 0.1, 10),
+        'solver': trial.suggest_categorical('solver_logistic', ['liblinear', 'lbfgs']),
+    }
+
+    # Create models with suggested hyperparameters
+    lgbm = LGBMClassifier(**lgbm_params)
+    catboost = CatBoostClassifier(**catboost_params)
+    log_reg = LogisticRegression(**log_reg_params)
+
+    # Define the stacking ensemble
+    estimators = [
+        ('logistic', log_reg),
+        ('lgbm', lgbm),
+        ('catboost', catboost)
+    ]
+
+    stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
+
+    # Construct the pipeline
+    pipeline = Pipeline([
+        ('scaler', StandardScaler()),
+        ('stacking_classifier', stacking_classifier)
+    ])
+
+    # Set up stratified k-fold
+    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=50)
+
+    # Perform cross-validation
+    accuracies = cross_val_score(pipeline, X_train, y_train, cv=kf, scoring='accuracy')
+    accuracy = accuracies.mean()
+
+    return accuracy
+
+# Optimize hyperparameters
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, n_trials=100)

@@ -502,7 +502,7 @@ estimators = [
     ('lgbm', lgbm),
     ('catboost', catboost)
 ]
-
+#Machine learning alg. stacking.
 stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
 
 # Construct the pipeline

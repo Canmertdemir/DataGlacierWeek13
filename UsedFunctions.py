@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.preprocessing import OrdinalEncoder
 
+
 def data_fix(dataframe):
     dataframe = dataframe.sort_index(axis=1).sort_index(axis=0)
     dataframe.drop("duration", axis=1, inplace=True)
@@ -176,6 +177,10 @@ y_pred = pipeline.predict(X_test)
 
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Test Accuracy: {accuracy}")
+from sklearn.externals import joblib
+
+joblib.dump(pipeline, 'stacking_classifier_model.pkl')
+
 """
 """
 def final_model_pipeline():

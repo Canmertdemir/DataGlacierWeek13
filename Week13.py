@@ -95,16 +95,19 @@ def final_model_pipeline():
     y_pred_proba = voting_classifier.predict_proba(X_train)[:, 1]
 
     # Calculate metrics on the test set
-    accuracy = accuracy_score(y_train, y_pred)
-    f1_score_value = f1_score(y_train, y_pred)
-    auc = roc_auc_score(y_train, y_pred_proba)
-
-    print(f"Test Accuracy: {accuracy}")
-    print(f"F1 Score: {f1_score_value}")
-    print(f"Test AUC Score: {auc}")
+    # accuracy = accuracy_score(y_train, y_pred)
+    # f1_score_value = f1_score(y_train, y_pred)
+    # auc = roc_auc_score(y_train, y_pred_proba)
+    #
+    # print(f"Test Accuracy: {accuracy}")
+    # print(f"F1 Score: {f1_score_value}")
+    # print(f"Test AUC Score: {auc}")
 
     df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
-    target_customer_list = df_test.loc[(df_test["y"] == "Yes") & (df_test["campaign"])]
-    target_customer_list.to_csv("Target_Customers.csv")
+    #target_customer_list = df_test.loc[(df_test["y"] == "Yes") & (df_test["campaign"])]
+    #target_customer_list.to_csv("Target_Customers.csv")
+
+    target_customer_list = df_test.loc[(df_test["y"] == "Yes")]
+    target_customer_list.to_csv("Target_Customer_All_Variables")
 
 final_model_pipeline()

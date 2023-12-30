@@ -1,38 +1,39 @@
 import numpy as np
-import optuna
-import sns
-from catboost import CatBoostClassifier
-from lightgbm import LGBMClassifier
-from matplotlib import pyplot as plt
-from scipy.stats import skewtest
-from sklearn.ensemble import StackingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import cross_val_score, StratifiedKFold
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, OrdinalEncoder
+from sklearn.preprocessing import OrdinalEncoder
+
+def data_fix(dataframe):
+    dataframe = dataframe.sort_index(axis=1).sort_index(axis=0)
+    dataframe.drop("duration", axis=1, inplace=True)
+
+    dataframe["cons.price.idx"] = np.log(dataframe["cons.price.idx"])
+    dataframe["nr.employed"] = np.log(dataframe["nr.employed"])
+
+def feature_eng(dataframe):
+    weight_euribor = 0.7
+    weight_price = 0.01
+    weight_conf = 0.29
+    dataframe['economic_index'] = ((weight_euribor * dataframe['euribor3m']) +
+                                   (weight_price * dataframe['cons.price.idx']) + (
+                                               weight_conf * dataframe['cons.conf.idx']))
+
+    dataframe['emp_var_euribor3m_sum'] = dataframe['emp.var.rate'] + dataframe['euribor3m']
+    dataframe['emp.var.rate_euribor3m_mult'] = dataframe['emp.var.rate'] * dataframe['euribor3m']
+    dataframe['unemployment_change'] = dataframe['emp.var.rate'] * dataframe['nr.employed']
 
 
-def quick_look(dataframe, head=5):
-    print("###################### SHAPE ##########################")
-    print(dataframe.shape)
 
-    print("########################## Describe #######################")
-    print(dataframe.describe().T)
+def ordinal_encoder(dataframe):
+    columns_to_encode = dataframe.select_dtypes(include='object').columns
 
-    print("####################### Variable Types ##################")
-    print(dataframe.dtypes)
+    for column in columns_to_encode:
+        ordinal_encoder = OrdinalEncoder()
 
-    print("###################### Head ##########################")
-    print(dataframe.head(head))
+        dataframe[column] = ordinal_encoder.fit_transform(dataframe[[column]])
 
-    print("###################### Tail ##########################")
-    print(dataframe.tail(head))
-    print("###################### NA ##########################")
-    print(dataframe.isna())
-    print("###################### NUMBER OF NA ##########################")
-    print(dataframe.isna().sum())
+    dataframe.drop(columns=['contact', 'day_of_week', 'default', 'education',
+                            'housing', 'job', 'loan', 'marital', 'month', 'poutcome'], inplace=True)
 
+# Some information about dataset.
 # There are four datasets:
 # 1) bank-additional-full.csv with all examples (41188) and 20 inputs,
 # ordered by date (from May 2008 to November 2010), very close to the data analyzed in [Moro et al., 2014]
@@ -57,14 +58,177 @@ def quick_look(dataframe, head=5):
 # It is hard to convert duration into bussiness metrics, so we decided to drop it.
 # Dropping useless variable
 
-def data_fix(dataframe):
-    dataframe = dataframe.sort_index(axis=1).sort_index(axis=0)
-    dataframe.drop("duration", axis=1, inplace=True)
-
-    dataframe["cons.price.idx"] = np.log(dataframe["cons.price.idx"])
-    dataframe["nr.employed"] = np.log(dataframe["nr.employed"])
 
 
+# EDA functions and optuna function are below, which are not used in thise stage.
+
+"""
+def objective(trial):
+    lgbm_params = {
+        'n_estimators': trial.suggest_int('n_estimators_lgbm', 50, 500),
+        'learning_rate': trial.suggest_loguniform('learning_rate_lgbm', 0.01, 0.1),
+        'max_depth': trial.suggest_int('max_depth_lgbm', 3, 10),
+        'num_leaves': trial.suggest_int('num_leaves_lgbm', 3, 40),
+    }
+
+    catboost_params = {
+        'iterations': trial.suggest_int('iterations_catboost', 50, 500),
+        'learning_rate': trial.suggest_loguniform('learning_rate_catboost', 0.01, 0.1),
+        'depth': trial.suggest_int('depth_catboost', 3, 10),
+    }
+
+    log_reg_params = {
+        'C': trial.suggest_loguniform('C_logistic', 0.1, 10),
+        'solver': trial.suggest_categorical('solver_logistic', ['liblinear', 'lbfgs']),
+    }
+
+    # Create models with suggested hyperparameters
+    lgbm = LGBMClassifier(**lgbm_params)
+    catboost = CatBoostClassifier(**catboost_params)
+    log_reg = LogisticRegression(**log_reg_params)
+
+    # Define the stacking ensemble
+    estimators = [
+        ('logistic', log_reg),
+        ('lgbm', lgbm),
+        ('catboost', catboost)
+    ]
+
+    stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
+
+    # Construct the pipeline
+    pipeline = Pipeline([
+        ('scaler', StandardScaler()),
+        ('stacking_classifier', stacking_classifier)
+    ])
+
+    # Set up stratified k-fold
+    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=50)
+
+    # Perform cross-validation
+    accuracies = cross_val_score(pipeline, X_train, y_train, cv=kf, scoring='accuracy')
+    accuracy = accuracies.mean()
+
+    return accuracy
+
+# Optimize hyperparameters
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, n_trials=100)
+"""
+"""
+def quick_look(dataframe, head=5):
+    print("###################### SHAPE ##########################")
+    print(dataframe.shape)
+
+    print("########################## Describe #######################")
+    print(dataframe.describe().T)
+
+    print("####################### Variable Types ##################")
+    print(dataframe.dtypes)
+
+    print("###################### Head ##########################")
+    print(dataframe.head(head))
+
+    print("###################### Tail ##########################")
+    print(dataframe.tail(head))
+    print("###################### NA ##########################")
+    print(dataframe.isna())
+    print("###################### NUMBER OF NA ##########################")
+    print(dataframe.isna().sum())
+"""
+
+"""
+# Use the best parameters which is found by optuna to train the final model
+#Best Parameters: {'n_estimators_lgbm': 444, 'learning_rate_lgbm': 0.09206587020378347,
+# 'max_depth_lgbm': 7, 'num_leaves_lgbm': 22, 'iterations_catboost': 482,
+# 'learning_rate_catboost': 0.011108413559931083, 'depth_catboost': 8, 'C_logistic': 0.4457968436493604, 'solver_logistic': 'liblinear'}
+
+#Seperation target variable and other variables.
+X = df.drop('y', axis=1)
+y = df['y']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=50, shuffle=True, stratify=y)
+
+#Define pipeline components
+scaler = StandardScaler()
+log_reg = LogisticRegression()
+lgbm = LGBMClassifier()
+catboost = CatBoostClassifier()
+
+# Define the stacking ensemble
+estimators = [
+    ('logistic', log_reg),
+    ('lgbm', lgbm),
+    ('catboost', catboost)
+]
+# Machine learning alg. stacking.
+stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
+
+# Construct the pipeline
+pipeline = Pipeline([
+    ('scaler', scaler),
+    ('stacking_classifier', stacking_classifier)
+])
+
+# Fit the pipeline
+pipeline.fit(X_train, y_train)
+# Predict and evaluate
+y_pred = pipeline.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {accuracy}")
+"""
+"""
+def final_model_pipeline():
+    data_fix(df)
+    data_fix(df_test)
+    feature_eng(df)
+    feature_eng(df_test)
+    ordinal_encoder(df)
+    ordinal_encoder(df_test)
+    X_train = df_test.drop("y", axis=1)
+    y_train = df_test["y"]
+
+    # Define classifiers with the best hyperparameters obtained
+    lgbm_best = LGBMClassifier(n_estimators=444, learning_rate=0.09206587020378347, max_depth=7, num_leaves=22)
+    catboost_best = CatBoostClassifier(iterations=482, learning_rate=0.011108413559931083, depth=8)
+    log_reg_best = LogisticRegression(C=0.4457968436493604, solver='liblinear', max_iter=1500)
+
+    # Create a VotingClassifier
+    voting_classifier = VotingClassifier(
+        estimators=[
+            ('lgbm', lgbm_best),
+            ('catboost', catboost_best),
+            ('logistic', log_reg_best)
+        ],
+        voting='soft'
+    )
+
+    # Fit the VotingClassifier
+    voting_classifier.fit(X_train, y_train)
+
+    # Predict
+    y_pred = voting_classifier.predict(X_test)
+    # Probability estimates for the positive class
+    y_pred_proba = voting_classifier.predict_proba(X_test)[:, 1]
+
+    # Calculate accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+    f1_score_value = f1_score(y_test, y_pred)
+    auc = roc_auc_score(y_test, y_pred_proba)
+
+    print(f"Test Accuracy: {accuracy}")
+    print(f"F1 Score: {f1_score_value}")
+    print(f"Test AUC Score: {auc}")
+
+    df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
+    target_customer_list = df_test.loc[(df_test["y"] == "Yes", ["age", "campaign"]) & df["default"]]
+
+    target_customer_list.to_csv("Target_Customers_in_Campain.csv")
+
+
+"""
+
+"""
 def grab_col_names(dataframe):
     cat_cols = [col for col in dataframe.columns if str(dataframe[col].dtypes) in ["category", "object", "bool"]]
     print("Categorical Variables", cat_cols)
@@ -196,7 +360,7 @@ def missing_values_table(dataframe):
     fig.tight_layout()
     plt.show()
 
-
+"""
 """
 def num_summary(dataframe, numerical_col, plot=False):
     print("Numerical variables distribution Check")
@@ -253,7 +417,7 @@ housing_loan_vs_default_yes_y_no = housing_loan_vs_default_yes[housing_loan_vs_d
 print(housing_loan_vs_default_yes_y_no)  # Banking campaing strategist must focus housing=yes, loan=yes people
 """
 
-
+"""
 def cor_analiz_cardinals(dataframe, plot=True):
 
     numeric_data = dataframe.select_dtypes(include=['float64', 'int64'])
@@ -275,9 +439,6 @@ def cor_analiz_cardinals(dataframe, plot=True):
         return correlated_pairs
 
 
-
-"""
-
 # {('cons.price.idx', 'emp.var.rate'): 0.7753341708348437, ('cons.price.idx', 'euribor3m'): 0.6882301070374915, ('emp.var.rate', 'euribor3m'): 0.9722446711516167,
 # ('emp.var.rate', 'nr.employed'): 0.9069701012560616, ('euribor3m', 'nr.employed'): 0.9451544313982757}
 
@@ -296,8 +457,8 @@ def cor_analiz_cardinals(dataframe, plot=True):
 # Now, we clean data and protect overfitting.
 correlated_variables_updated = cor_analiz_cardinals(df)
 print(correlated_variables_updated)
-"""
-"""
+
+
 df['total_campaign_per_contacts'] = df.groupby('campaign')['contact'].transform('count')
 df_test['total_campaign_per_contacts'] = df_test.groupby('campaign')['contact'].transform('count')
 age_vs_campaign = df.groupby(["age", "campaign"]).size().reset_index(name='count')
@@ -378,8 +539,7 @@ plt.xlabel('Response (Yes/No)')
 plt.ylabel('Count')
 plt.show()
 """
-
-
+"""
 def outlier_thresholds(dataframe, col_name, q1=0.01, q3=0.99):
     quartile1 = dataframe[col_name].quantile(q1)
     quartile3 = dataframe[col_name].quantile(q3)
@@ -415,22 +575,7 @@ def grab_outliers(dataframe, col_name, index=False):
         outlier_index = dataframe[((dataframe[col_name] < low) | (dataframe[col_name] > up))].index
         return outlier_index
 
-
-def feature_eng(dataframe):
-    weight_euribor = 0.7
-    weight_price = 0.01
-    weight_conf = 0.29
-    dataframe['economic_index'] = ((weight_euribor * dataframe['euribor3m']) +
-                                   (weight_price * dataframe['cons.price.idx']) + (
-                                               weight_conf * dataframe['cons.conf.idx']))
-
-    dataframe['emp_var_euribor3m_sum'] = dataframe['emp.var.rate'] + dataframe['euribor3m']
-    dataframe['emp.var.rate_euribor3m_mult'] = dataframe['emp.var.rate'] * dataframe['euribor3m']
-    dataframe['unemployment_change'] = dataframe['emp.var.rate'] * dataframe['nr.employed']
-
-#for col in num_cols:
-    #print(col, grab_outliers(df, col))
-
+"""
 
 """
 estimators = voting_classifier.estimators_
@@ -486,155 +631,112 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 """
+"""
+estimators = voting_classifier.estimators_
+# Logistic reg. does not support feature importance
+for clf in estimators:
+    # Check if the classifier supports feature importances
+    if hasattr(clf, 'feature_importances_'):
+        # Access feature importances for classifiers that support it
+        print(clf.__class__.__name__)
+        print(clf.feature_importances_)
+    else:
+        print(f"{clf.__class__.__name__} doesn't support feature importances.")
 
 
-def ordinal_encoder(dataframe):
-    columns_to_encode = dataframe.select_dtypes(include='object').columns
+# LGBMClassifier Feature Importances
+lgbm_importances = [2043, 835, 189, 184, 26, 1442, 72, 283, 215, 1216, 503, 528, 0]
 
-    for column in columns_to_encode:
-        ordinal_encoder = OrdinalEncoder()
+# CatBoostClassifier Feature Importances
+catboost_importances = [24.58400596, 18.18117565, 4.29555275, 4.66507319, 1.89777152, 7.1069525, 3.51773398,
+                        5.20804388, 4.54704207, 9.01263334, 6.4312837, 8.65178253, 1.90094893]
 
-        dataframe[column] = ordinal_encoder.fit_transform(dataframe[[column]])
+# Assuming you have feature names stored in a list called 'feature_names'
+feature_names = ['age', 'campaign', 'cons.conf.idx', 'cons.price.idx', 'emp.var.rate',
+       'euribor3m', 'nr.employed', 'pdays', 'previous', 'y', 'economic_index',
+       'emp_var_euribor3m_sum', 'emp.var.rate_euribor3m_mult',
+       'unemployment_change']
 
-    dataframe.drop(columns=['contact', 'day_of_week', 'default', 'education',
-                            'housing', 'job', 'loan', 'marital', 'month', 'poutcome'], inplace=True)
+# Sort feature importances for LGBMClassifier and CatBoostClassifier in descending order
+indices_lgbm = np.argsort(lgbm_importances)[::-1]
+sorted_feature_names_lgbm = [feature_names[i] for i in indices_lgbm]
+sorted_importances_lgbm = np.array(lgbm_importances)[indices_lgbm]
 
+indices_catboost = np.argsort(catboost_importances)[::-1]
+sorted_feature_names_catboost = [feature_names[i] for i in indices_catboost]
+sorted_importances_catboost = np.array(catboost_importances)[indices_catboost]
 
-def objective(trial):
-    lgbm_params = {
-        'n_estimators': trial.suggest_int('n_estimators_lgbm', 50, 500),
-        'learning_rate': trial.suggest_loguniform('learning_rate_lgbm', 0.01, 0.1),
-        'max_depth': trial.suggest_int('max_depth_lgbm', 3, 10),
-        'num_leaves': trial.suggest_int('num_leaves_lgbm', 3, 40),
-    }
+# Finding common features
+common_features = set(sorted_feature_names_lgbm).intersection(set(sorted_feature_names_catboost))
 
-    catboost_params = {
-        'iterations': trial.suggest_int('iterations_catboost', 50, 500),
-        'learning_rate': trial.suggest_loguniform('learning_rate_catboost', 0.01, 0.1),
-        'depth': trial.suggest_int('depth_catboost', 3, 10),
-    }
+# Displaying common features and their importances
+common_features_importance_lgbm = [importance for feature, importance in zip(sorted_feature_names_lgbm, sorted_importances_lgbm) if feature in common_features]
+common_features_importance_catboost = [importance for feature, importance in zip(sorted_feature_names_catboost, sorted_importances_catboost) if feature in common_features]
 
-    log_reg_params = {
-        'C': trial.suggest_loguniform('C_logistic', 0.1, 10),
-        'solver': trial.suggest_categorical('solver_logistic', ['liblinear', 'lbfgs']),
-    }
+# Plotting common feature importances
+plt.figure(figsize=(10, 6))
+plt.title("Common Feature Importances between LGBMClassifier and CatBoostClassifier")
+plt.bar(range(len(common_features)), common_features_importance_lgbm, align="center", alpha=0.5, label='LGBM')
+plt.bar(range(len(common_features)), common_features_importance_catboost, align="center", alpha=0.5, label='CatBoost')
+plt.xticks(range(len(common_features)), common_features, rotation=90)
+plt.xlabel("Features")
+plt.ylabel("Feature Importance")
+plt.legend()
+plt.tight_layout()
+plt.show()
+"""
 
-    # Create models with suggested hyperparameters
-    lgbm = LGBMClassifier(**lgbm_params)
-    catboost = CatBoostClassifier(**catboost_params)
-    log_reg = LogisticRegression(**log_reg_params)
-
-    # Define the stacking ensemble
-    estimators = [
-        ('logistic', log_reg),
-        ('lgbm', lgbm),
-        ('catboost', catboost)
-    ]
-
-    stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
-
-    # Construct the pipeline
-    pipeline = Pipeline([
-        ('scaler', StandardScaler()),
-        ('stacking_classifier', stacking_classifier)
-    ])
-
-    # Set up stratified k-fold
-    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=50)
-
-    # Perform cross-validation
-    accuracies = cross_val_score(pipeline, X_train, y_train, cv=kf, scoring='accuracy')
-    accuracy = accuracies.mean()
-
-    return accuracy
-
-# Optimize hyperparameters
-study = optuna.create_study(direction='maximize')
-study.optimize(objective, n_trials=100)
-
-# Use the best parameters which is found by optuna to train the final model
-#Best Parameters: {'n_estimators_lgbm': 444, 'learning_rate_lgbm': 0.09206587020378347,
-# 'max_depth_lgbm': 7, 'num_leaves_lgbm': 22, 'iterations_catboost': 482,
-# 'learning_rate_catboost': 0.011108413559931083, 'depth_catboost': 8, 'C_logistic': 0.4457968436493604, 'solver_logistic': 'liblinear'}
-
-#Seperation target variable and other variables.
-X = df.drop('y', axis=1)
-y = df['y']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=50, shuffle=True, stratify=y)
-
-#Define pipeline components
-scaler = StandardScaler()
-log_reg = LogisticRegression()
-lgbm = LGBMClassifier()
-catboost = CatBoostClassifier()
-
-# Define the stacking ensemble
-estimators = [
-    ('logistic', log_reg),
-    ('lgbm', lgbm),
-    ('catboost', catboost)
-]
-# Machine learning alg. stacking.
-stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
-
-# Construct the pipeline
-pipeline = Pipeline([
-    ('scaler', scaler),
-    ('stacking_classifier', stacking_classifier)
-])
-
-# Fit the pipeline
-pipeline.fit(X_train, y_train)
-# Predict and evaluate
-y_pred = pipeline.predict(X_test)
-
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Test Accuracy: {accuracy}")
+"""
+estimators = voting_classifier.estimators_
+# Logistic reg. does not support feature importance
+for clf in estimators:
+    # Check if the classifier supports feature importances
+    if hasattr(clf, 'feature_importances_'):
+        # Access feature importances for classifiers that support it
+        print(clf.__class__.__name__)
+        print(clf.feature_importances_)
+    else:
+        print(f"{clf.__class__.__name__} doesn't support feature importances.")
 
 
-def final_model_pipeline():
-    data_fix(df)
-    data_fix(df_test)
-    feature_eng(df)
-    feature_eng(df_test)
-    ordinal_encoder(df)
-    ordinal_encoder(df_test)
-    X_train = df_test.drop("y", axis=1)
-    y_train = df_test["y"]
+# LGBMClassifier Feature Importances
+lgbm_importances = [2043, 835, 189, 184, 26, 1442, 72, 283, 215, 1216, 503, 528, 0]
 
-    # Define classifiers with the best hyperparameters obtained
-    lgbm_best = LGBMClassifier(n_estimators=444, learning_rate=0.09206587020378347, max_depth=7, num_leaves=22)
-    catboost_best = CatBoostClassifier(iterations=482, learning_rate=0.011108413559931083, depth=8)
-    log_reg_best = LogisticRegression(C=0.4457968436493604, solver='liblinear', max_iter=1500)
+# CatBoostClassifier Feature Importances
+catboost_importances = [24.58400596, 18.18117565, 4.29555275, 4.66507319, 1.89777152, 7.1069525, 3.51773398,
+                        5.20804388, 4.54704207, 9.01263334, 6.4312837, 8.65178253, 1.90094893]
 
-    # Create a VotingClassifier
-    voting_classifier = VotingClassifier(
-        estimators=[
-            ('lgbm', lgbm_best),
-            ('catboost', catboost_best),
-            ('logistic', log_reg_best)
-        ],
-        voting='soft'
-    )
+# Assuming you have feature names stored in a list called 'feature_names'
+feature_names = ['age', 'campaign', 'cons.conf.idx', 'cons.price.idx', 'emp.var.rate',
+       'euribor3m', 'nr.employed', 'pdays', 'previous', 'y', 'economic_index',
+       'emp_var_euribor3m_sum', 'emp.var.rate_euribor3m_mult',
+       'unemployment_change']
 
-    # Fit the VotingClassifier
-    voting_classifier.fit(X_train, y_train)
+# Sort feature importances for LGBMClassifier and CatBoostClassifier in descending order
+indices_lgbm = np.argsort(lgbm_importances)[::-1]
+sorted_feature_names_lgbm = [feature_names[i] for i in indices_lgbm]
+sorted_importances_lgbm = np.array(lgbm_importances)[indices_lgbm]
 
-    # Predict
-    y_pred = voting_classifier.predict(X_test)
-    # Probability estimates for the positive class
-    y_pred_proba = voting_classifier.predict_proba(X_test)[:, 1]
+indices_catboost = np.argsort(catboost_importances)[::-1]
+sorted_feature_names_catboost = [feature_names[i] for i in indices_catboost]
+sorted_importances_catboost = np.array(catboost_importances)[indices_catboost]
 
-    # Calculate accuracy
-    accuracy = accuracy_score(y_test, y_pred)
-    f1_score_value = f1_score(y_test, y_pred)
-    auc = roc_auc_score(y_test, y_pred_proba)
+# Finding common features
+common_features = set(sorted_feature_names_lgbm).intersection(set(sorted_feature_names_catboost))
 
-    print(f"Test Accuracy: {accuracy}")
-    print(f"F1 Score: {f1_score_value}")
-    print(f"Test AUC Score: {auc}")
+# Displaying common features and their importances
+common_features_importance_lgbm = [importance for feature, importance in zip(sorted_feature_names_lgbm, sorted_importances_lgbm) if feature in common_features]
+common_features_importance_catboost = [importance for feature, importance in zip(sorted_feature_names_catboost, sorted_importances_catboost) if feature in common_features]
 
-    df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
-    target_customer_list = df_test.loc[(df_test["y"] == "Yes", ["age", "campaign"]) & df["default"]]
-
-    target_customer_list.to_csv("Target_Customers_in_Campain.csv")
+# Plotting common feature importances
+plt.figure(figsize=(10, 6))
+plt.title("Common Feature Importances between LGBMClassifier and CatBoostClassifier")
+plt.bar(range(len(common_features)), common_features_importance_lgbm, align="center", alpha=0.5, label='LGBM')
+plt.bar(range(len(common_features)), common_features_importance_catboost, align="center", alpha=0.5, label='CatBoost')
+plt.xticks(range(len(common_features)), common_features, rotation=90)
+plt.xlabel("Features")
+plt.ylabel("Feature Importance")
+plt.legend()
+plt.tight_layout()
+plt.show()
+"""

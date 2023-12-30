@@ -2,6 +2,7 @@
 TEAM MEMBER’S DETAILS
 Group Name: Banking Insights Squad
 Group: Members: Canmert Demir & Joseph Pang
+
 Names: Canmert Demir-Bank Marketing (Campaign) -- Group Project
 Email: canmertdemir2@gmail.com
 Country: Turkey
@@ -16,27 +17,25 @@ Specialization: Data Science
 Github Repository:
 """
 
-import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
-from sklearn.ensemble import StackingClassifier, VotingClassifier
+from sklearn.ensemble import VotingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler
-from UsedFunctions import *
+from UsedFunctions import data_fix, feature_eng, ordinal_encoder
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 400)
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
 pd.set_option('display.expand_frame_repr', False)
 
-df_test = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject\\DataGlacierWeek9\\bank-additional.csv", sep=';') #testdata
-df = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject\\DataGlacierWeek9\\bank-additional-full.csv", sep=';') #traindata
-
 def final_model_pipeline():
+
+    df_test = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject"
+                          "\\DataGlacierWeek9\\bank-additional.csv", sep=';')
+    df = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject"
+                     "\\DataGlacierWeek9\\bank-additional-full.csv", sep=';')
 
     data_fix(df)
     data_fix(df_test)

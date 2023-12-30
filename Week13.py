@@ -20,10 +20,15 @@ Github Repository:
 import pandas as pd
 from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
-from sklearn.ensemble import VotingClassifier
+from sklearn.ensemble import VotingClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from UsedFunctions import data_fix, feature_eng, ordinal_encoder
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+
+from DataGlacierWeek13.UsedFunctions import data_fix, feature_eng, ordinal_encoder
+import numpy as np
+from sklearn.preprocessing import OrdinalEncoder
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 400)
@@ -32,10 +37,11 @@ pd.set_option('display.expand_frame_repr', False)
 
 def final_model_pipeline():
 
-    df_test = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject"
+    df_test = pd.read_csv(r"C:\\Users\\Can\\PycharmProjects\\pythonProject"
                           "\\DataGlacierWeek9\\bank-additional.csv", sep=';')
-    df = pd.read_csv("C:\\Users\\Can\\PycharmProjects\\pythonProject"
+    df = pd.read_csv(r"C:\\Users\\Can\\PycharmProjects\\pythonProject"
                      "\\DataGlacierWeek9\\bank-additional-full.csv", sep=';')
+    df_copy = df.copy()
 
     data_fix(df)
     data_fix(df_test)
@@ -45,6 +51,33 @@ def final_model_pipeline():
 
     ordinal_encoder(df)
     ordinal_encoder(df_test)
+
+    X = df.drop('y', axis=1)
+    y = df['y']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=50, shuffle=True, stratify=y)
+
+    log_reg = LogisticRegression()
+    lgbm = LGBMClassifier()
+    catboost = CatBoostClassifier()
+
+    # Define the stacking ensemble
+    estimators = [
+        ('logistic', log_reg),
+        ('lgbm', lgbm),
+        ('catboost', catboost)
+    ]
+    # Machine learning alg. stacking.
+    stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
+
+    # Construct the pipeline
+    pipeline = Pipeline([
+        ('stacking_classifier', stacking_classifier)
+    ])
+
+    # Fit the pipeline
+    pipeline.fit(X_train, y_train)
+    # Predict and evaluate
+    y_pred = pipeline.predict(X_test)
 
     X_train = df_test.drop("y", axis=1)
     y_train = df_test["y"]
@@ -62,22 +95,42 @@ def final_model_pipeline():
         voting='soft'
     )
 
+    # Assuming X_train, y_train, X_test, y_test are prepared
+
+    # Train the voting classifier
     voting_classifier.fit(X_train, y_train)
+
+    # Make predictions on the test set
     y_pred = voting_classifier.predict(X_test)
     y_pred_proba = voting_classifier.predict_proba(X_test)[:, 1]
 
+    # Calculate metrics on the test set
     accuracy = accuracy_score(y_test, y_pred)
     f1_score_value = f1_score(y_test, y_pred)
     auc = roc_auc_score(y_test, y_pred_proba)
+
+    # Filtering target customers
+    target_customer_list = df_test.loc[
+        (df_test["y"] == "Yes") &
+        (df_test["age"]) &
+        (df_test["campaign"])
+        ]
+
+    # Save the target customers to a CSV file
+    target_customer_list.to_csv("Target_Customers_in_Campaign.csv", index=False)
 
     print(f"Test Accuracy: {accuracy}")
     print(f"F1 Score: {f1_score_value}")
     print(f"Test AUC Score: {auc}")
 
     df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
+
     target_customer_list = df_test.loc[
-        (df_test["y"] == "Yes") & (df["default"]) & ((df_test["age"]) & (df_test["campaign"]))]
+        (df_test["y"] == "Yes") &
+        (df_test["age"]) &
+        (df_test["campaign"])
+        ]
 
     target_customer_list.to_csv("Target_Customers_in_Campain.csv")
 
-
+final_model_pipeline()

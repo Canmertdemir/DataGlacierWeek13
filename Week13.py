@@ -108,6 +108,7 @@ def final_model_pipeline():
     #target_customer_list.to_csv("Target_Customers.csv")
 
     target_customer_list = df_test.loc[(df_test["y"] == "Yes")]
-    target_customer_list.to_csv("Target_Customer_All_Variables")
+    target_customer_list.to_csv("Target_Customer_All_Variables.csv")
 
 final_model_pipeline()
+

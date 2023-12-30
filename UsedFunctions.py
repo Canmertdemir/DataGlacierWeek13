@@ -7,9 +7,10 @@ from matplotlib import pyplot as plt
 from scipy.stats import skewtest
 from sklearn.ensemble import StackingClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OrdinalEncoder
 
 
 def quick_look(dataframe, head=5):
@@ -31,6 +32,37 @@ def quick_look(dataframe, head=5):
     print(dataframe.isna())
     print("###################### NUMBER OF NA ##########################")
     print(dataframe.isna().sum())
+
+# There are four datasets:
+# 1) bank-additional-full.csv with all examples (41188) and 20 inputs,
+# ordered by date (from May 2008 to November 2010), very close to the data analyzed in [Moro et al., 2014]
+# 2) bank-additional.csv with 10% of the examples (4119), randomly selected from 1), and 20 inputs.
+
+# Categorical Variable Analysis
+# The distribution of categorical variables isn't balanced across classes.
+# The target variable 'y' exhibits an imbalance.
+# 'Education' predominantly comprises individuals with university and high school degrees.
+# 'Housing' classes are distributed closely, with 'yes' being the more dominant class.
+# 'Job' shows three dominant classes: admin, blue-collar, and technician. Other job categories exhibit minimal differences.
+# 'Loan' has three classes, with 'no' being the dominant one among all others.
+# 'Marital' features three classes, with the majority being married or single. 'Married' stands as the dominant class.
+# 'Month' encompasses 10 classes. May, June, July, August, and November hold significant importance.
+# 'Poutcome' showcases three classes, with the 'nonexistent' class being the dominant one. This suggests that the majority of people have not attended a campaign before.
+# Numerical variables do not distribute normally.
+# Assuming df is your DataFrame
+# df["euribor3m"] = np.log(df["euribor3m"]) creates inf and nan values.
+# df["emp.var.rate"] = np.log(df["emp.var.rate"]) creating nan values.
+# df["cons.conf.idx"] = np.log(df["cons.conf.idx"]) does not use because variable values in [-inf, 0]
+
+# It is hard to convert duration into bussiness metrics, so we decided to drop it.
+# Dropping useless variable
+
+def data_fix(dataframe):
+    dataframe = dataframe.sort_index(axis=1).sort_index(axis=0)
+    dataframe.drop("duration", axis=1, inplace=True)
+
+    dataframe["cons.price.idx"] = np.log(dataframe["cons.price.idx"])
+    dataframe["nr.employed"] = np.log(dataframe["nr.employed"])
 
 
 def grab_col_names(dataframe):
@@ -99,9 +131,6 @@ def num_scatter(dataframe, numerical_cols, plot=False):
             plt.title(f"Scatter plot of {col}")
             plt.show(block=True)
 
-
-
-# %%
 def analyze_skewness_distribution(data):
     skewness_distribution_results = {}
 
@@ -387,6 +416,18 @@ def grab_outliers(dataframe, col_name, index=False):
         return outlier_index
 
 
+def feature_eng(dataframe):
+    weight_euribor = 0.7
+    weight_price = 0.01
+    weight_conf = 0.29
+    dataframe['economic_index'] = ((weight_euribor * dataframe['euribor3m']) +
+                                   (weight_price * dataframe['cons.price.idx']) + (
+                                               weight_conf * dataframe['cons.conf.idx']))
+
+    dataframe['emp_var_euribor3m_sum'] = dataframe['emp.var.rate'] + dataframe['euribor3m']
+    dataframe['emp.var.rate_euribor3m_mult'] = dataframe['emp.var.rate'] * dataframe['euribor3m']
+    dataframe['unemployment_change'] = dataframe['emp.var.rate'] * dataframe['nr.employed']
+
 #for col in num_cols:
     #print(col, grab_outliers(df, col))
 
@@ -447,6 +488,18 @@ plt.show()
 """
 
 
+def ordinal_encoder(dataframe):
+    columns_to_encode = dataframe.select_dtypes(include='object').columns
+
+    for column in columns_to_encode:
+        ordinal_encoder = OrdinalEncoder()
+
+        dataframe[column] = ordinal_encoder.fit_transform(dataframe[[column]])
+
+    dataframe.drop(columns=['contact', 'day_of_week', 'default', 'education',
+                            'housing', 'job', 'loan', 'marital', 'month', 'poutcome'], inplace=True)
+
+
 def objective(trial):
     lgbm_params = {
         'n_estimators': trial.suggest_int('n_estimators_lgbm', 50, 500),
@@ -498,3 +551,90 @@ def objective(trial):
 # Optimize hyperparameters
 study = optuna.create_study(direction='maximize')
 study.optimize(objective, n_trials=100)
+
+# Use the best parameters which is found by optuna to train the final model
+#Best Parameters: {'n_estimators_lgbm': 444, 'learning_rate_lgbm': 0.09206587020378347,
+# 'max_depth_lgbm': 7, 'num_leaves_lgbm': 22, 'iterations_catboost': 482,
+# 'learning_rate_catboost': 0.011108413559931083, 'depth_catboost': 8, 'C_logistic': 0.4457968436493604, 'solver_logistic': 'liblinear'}
+
+#Seperation target variable and other variables.
+X = df.drop('y', axis=1)
+y = df['y']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=50, shuffle=True, stratify=y)
+
+#Define pipeline components
+scaler = StandardScaler()
+log_reg = LogisticRegression()
+lgbm = LGBMClassifier()
+catboost = CatBoostClassifier()
+
+# Define the stacking ensemble
+estimators = [
+    ('logistic', log_reg),
+    ('lgbm', lgbm),
+    ('catboost', catboost)
+]
+# Machine learning alg. stacking.
+stacking_classifier = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
+
+# Construct the pipeline
+pipeline = Pipeline([
+    ('scaler', scaler),
+    ('stacking_classifier', stacking_classifier)
+])
+
+# Fit the pipeline
+pipeline.fit(X_train, y_train)
+# Predict and evaluate
+y_pred = pipeline.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {accuracy}")
+
+
+def final_model_pipeline():
+    data_fix(df)
+    data_fix(df_test)
+    feature_eng(df)
+    feature_eng(df_test)
+    ordinal_encoder(df)
+    ordinal_encoder(df_test)
+    X_train = df_test.drop("y", axis=1)
+    y_train = df_test["y"]
+
+    # Define classifiers with the best hyperparameters obtained
+    lgbm_best = LGBMClassifier(n_estimators=444, learning_rate=0.09206587020378347, max_depth=7, num_leaves=22)
+    catboost_best = CatBoostClassifier(iterations=482, learning_rate=0.011108413559931083, depth=8)
+    log_reg_best = LogisticRegression(C=0.4457968436493604, solver='liblinear', max_iter=1500)
+
+    # Create a VotingClassifier
+    voting_classifier = VotingClassifier(
+        estimators=[
+            ('lgbm', lgbm_best),
+            ('catboost', catboost_best),
+            ('logistic', log_reg_best)
+        ],
+        voting='soft'
+    )
+
+    # Fit the VotingClassifier
+    voting_classifier.fit(X_train, y_train)
+
+    # Predict
+    y_pred = voting_classifier.predict(X_test)
+    # Probability estimates for the positive class
+    y_pred_proba = voting_classifier.predict_proba(X_test)[:, 1]
+
+    # Calculate accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+    f1_score_value = f1_score(y_test, y_pred)
+    auc = roc_auc_score(y_test, y_pred_proba)
+
+    print(f"Test Accuracy: {accuracy}")
+    print(f"F1 Score: {f1_score_value}")
+    print(f"Test AUC Score: {auc}")
+
+    df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
+    target_customer_list = df_test.loc[(df_test["y"] == "Yes", ["age", "campaign"]) & df["default"]]
+
+    target_customer_list.to_csv("Target_Customers_in_Campain.csv")

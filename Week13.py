@@ -75,7 +75,9 @@ def final_model_pipeline():
     print(f"Test AUC Score: {auc}")
 
     df_test["y"] = ["No" if val == 0 else "Yes" for val in df_test["y"]]
-    target_customer_list = df_test.loc[(df_test["y"] == "Yes", ["age", "campaign"]) & df["default"]]
+    target_customer_list = df_test.loc[
+        (df_test["y"] == "Yes") & (df["default"]) & ((df_test["age"]) & (df_test["campaign"]))]
+
     target_customer_list.to_csv("Target_Customers_in_Campain.csv")
 
 
